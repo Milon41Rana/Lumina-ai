@@ -84,16 +84,23 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // Only listen if not on Vercel
+  if (process.env.NODE_ENV !== "production") {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
+  
+  return app;
 }
 
-startServer();
+// For local development
+if (process.env.NODE_ENV !== "production") {
+  startServer();
+}
 
+// Export for Vercel
 export default async (req: any, res: any) => {
-  // This export is for Vercel serverless functions
-  // It ensures the server logic can be handled by Vercel
   const app = await startServer();
-  return app;
+  return app(req, res);
 };
