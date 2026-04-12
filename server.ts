@@ -90,3 +90,10 @@ async function startServer() {
 }
 
 startServer();
+
+export default async (req: any, res: any) => {
+  // This export is for Vercel serverless functions
+  // It ensures the server logic can be handled by Vercel
+  const app = await startServer();
+  return app;
+};
