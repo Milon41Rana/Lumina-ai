@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
@@ -12,26 +11,15 @@ app.use(express.json());
 
 // API route to handle AI responses
 app.post("/api/chat", async (req, res) => {
-  const { message, history } = req.body;
-
-  // Check for API key inside the request to be safe
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.error("ERROR: API Key is missing!");
-    return res.status(500).json({ 
-      error: "API Key is missing in Vercel environment variables. Please add GOOGLE_GENERATIVE_AI_API_KEY in Vercel settings." 
-    });
-  }
-
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const { message, history } = req.body;
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
     
-    // Set headers for streaming
+    if (!apiKey) {
+      return res.status(500).json({ error: "API Key is missing in Vercel. Please add GOOGLE_GENERATIVE_AI_API_KEY in Settings > Environment Variables." });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Transfer-Encoding", "chunked");
 
@@ -53,25 +41,18 @@ app.post("/api/chat", async (req, res) => {
     res.end();
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    let errorMessage = "Failed to generate AI response";
-    let statusCode = 500;
-
-    if (error.status === 429 || (error.message && error.message.includes("429"))) {
-      statusCode = 429;
-      errorMessage = "Rate limit exceeded. Please try again in a few seconds.";
-    }
-
     if (!res.headersSent) {
-      res.status(statusCode).json({ error: errorMessage, details: error.message });
+      res.status(500).json({ error: "AI logic failed", details: error.message });
     } else {
-      res.write(`\n\n[Error: ${errorMessage}]`);
       res.end();
     }
   }
 });
 
-// Vite middleware for development vs static for production
+// Handle Frontend
 if (process.env.NODE_ENV !== "production") {
+  // Dynamic import for Vite to avoid issues in production
+  const { createServer: createViteServer } = await import("vite");
   const vite = await createViteServer({
     server: { middlewareMode: true },
     appType: "spa",
