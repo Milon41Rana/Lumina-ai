@@ -49,12 +49,21 @@ export default function App() {
 
   // Scroll to bottom when messages change
   React.useEffect(() => {
-    if (scrollRef.current) {
-      const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    const scrollToBottom = () => {
+      if (scrollRef.current) {
+        const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (scrollContainer) {
+          scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: "smooth"
+          });
+        }
       }
-    }
+    };
+
+    // Use requestAnimationFrame to ensure the DOM has updated before scrolling
+    const timeoutId = setTimeout(scrollToBottom, 100);
+    return () => clearTimeout(timeoutId);
   }, [sessions, currentSessionId, isTyping]);
 
   const currentSession = sessions.find((s) => s.id === currentSessionId) || null;
