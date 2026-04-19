@@ -12,43 +12,60 @@ app.use(express.json());
 // Initialize Gemini once if API key is available at startup
 const globalApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
 
-// API route to handle AI responses
-app.post("/api/chat", async (req, res) => {
+// API route to handle AI responses for Lumina Studio VFS Generation
+app.post("/api/generate", async (req, res) => {
   try {
-    const { message, history } = req.body;
-    const apiKey = globalApiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY;
+    const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      return res.status(500).json({ error: "API Key is missing. Please add GOOGLE_GENERATIVE_AI_API_KEY in Vercel Settings." });
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY. Add it to your server environment variables." });
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Transfer-Encoding", "chunked");
-
-    const chat = ai.chats.create({
-      model: "gemini-3-flash-preview",
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite-preview",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: {
-        systemInstruction: "You are Z-Assistant, a professional research partner who analyzes text and YouTube videos.",
-      },
-      history: history || [],
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            explanation: { type: "STRING" },
+            files: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: { 
+                  name: { type: "STRING" }, 
+                  content: { type: "STRING" } 
+                },
+                required: ["name", "content"]
+              }
+            }
+          },
+          required: ["explanation", "files"]
+        },
+        systemInstruction: `You are Lumina AI Studio, a Full-Stack Meta-Builder.
+        
+        TASK:
+        Generate a "Virtual File System" (VFS) based on user instructions.
+        
+        MANDATORY FILES (Must always be included);
+        1. 'index.html': Standard entry point using Tailwind CDN.
+        2. 'manifest.json': PWA configuration.
+        3. 'firebase.ts': Setup and initialization code.
+
+        Output strictly valid JSON.`,
+      }
     });
 
-    const result = await chat.sendMessageStream({ message });
-
-    for await (const chunk of result) {
-      if (chunk.text) {
-        res.write(chunk.text);
-      }
-    }
-    res.end();
+    const data = JSON.parse(response.text.trim());
+    res.json(data);
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: "AI failed to respond", details: error.message });
-    } else {
-      res.end();
-    }
+    console.error("Gemini Server Error:", error);
+    res.status(500).json({ error: "Architecture synchronization failed", details: error.message });
   }
 });
 

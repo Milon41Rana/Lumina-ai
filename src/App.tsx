@@ -35,7 +35,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { GoogleGenAI, Type } from "@google/genai";
 import { motion, AnimatePresence } from "motion/react";
 
 // --- Types ---
@@ -78,14 +77,17 @@ export default function App() {
   const [previewDevice, setPreviewDevice] = React.useState<"mobile" | "desktop">("desktop");
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
-  const ai = React.useMemo(() => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" }), [process.env.GEMINI_API_KEY]);
   const chatEndRef = React.useRef<HTMLDivElement>(null);
+  const initialLogged = React.useRef(false);
 
   React.useEffect(() => {
-    addTerminalLog("Build Start");
-    addTerminalLog("Render Start");
-    addTerminalLog("CONNECTED");
-    addTerminalLog("Lumina Engine Ready");
+    if (!initialLogged.current) {
+      addTerminalLog("Build Start");
+      addTerminalLog("Render Start");
+      addTerminalLog("CONNECTED");
+      addTerminalLog("Lumina Engine Ready");
+      initialLogged.current = true;
+    }
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -94,6 +96,9 @@ export default function App() {
     }
 
     const handleMessage = (event: MessageEvent) => {
+      // Filter out benign Vite HMR errors/logs
+      if (typeof event.data?.message === 'string' && event.data.message.includes('[vite]')) return;
+
       if (event.data?.type === "log" || event.data?.type === "error") {
         setPreviewLogs(prev => [...prev.slice(-30), { 
           id: crypto.randomUUID(), 
@@ -125,51 +130,23 @@ export default function App() {
     addTerminalLog(`Syncing prompt: ${userMessage.slice(0, 15)}...`);
 
     try {
-      if (!process.env.GEMINI_API_KEY) throw new Error("API Key configuration error.");
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              explanation: { type: Type.STRING },
-              files: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: { name: { type: Type.STRING }, content: { type: Type.STRING } },
-                  required: ["name", "content"]
-                }
-              }
-            },
-            required: ["explanation", "files"]
-          },
-          systemInstruction: `You are Lumina AI Studio, a Full-Stack Meta-Builder.
-          
-          TASK:
-          Generate a "Virtual File System" (VFS) based on user instructions.
-          
-          MANDATORY FILES (Must always be included in the 'files' array):
-          1. 'index.html': Standard entry point using Tailwind CDN.
-          2. 'manifest.json': PWA configuration (name, short_name, icons, theme_color).
-          3. 'firebase.ts': Firebase configuration and initialization code.
-          
-          OUTPUT STYLE:
-          - Provide a clear explanation of what you built.
-          - Output strictly valid JSON.
-          - Do not provide code blocks outside the JSON 'content' fields.`,
-        }
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: userMessage }),
       });
 
-      const data = JSON.parse(response.text.replace(/^```json\n?/, "").replace(/\n?```$/, "").trim());
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || errorData.error || "Server synchronization failed");
+      }
+
+      const data = await res.json();
       
       const newAction: ActionLog = {
         id: crypto.randomUUID(),
-        action: `Edited ${data.files.length} files`,
-        files: data.files.map((f: any) => f.name),
+        action: `Edited ${data.files?.length || 0} files`,
+        files: data.files?.map((f: any) => f.name) || [],
       };
 
       setMessages(prev => [...prev, { role: "model", content: data.explanation, actions: newAction }]);
@@ -477,6 +454,10 @@ export default function App() {
                    <div className="flex items-center gap-3">
                       <Terminal className="w-3.5 h-3.5 text-slate-300" />
                       <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Build Runtime Logs</span>
+                      <RotateCcw 
+                        onClick={() => setTerminalLogs([])} 
+                        className="w-3 h-3 text-slate-300 hover:text-slate-600 cursor-pointer transition-colors ml-2" 
+                      />
                    </div>
                    <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-ping" />
