@@ -16,10 +16,18 @@ const globalApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEM
 app.post("/api/generate", async (req, res) => {
   try {
     const { prompt } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    
+    // Support multiple variable names for better compatibility
+    const apiKey = process.env.GEMINI_API_KEY || 
+                   process.env.GOOGLE_API_KEY || 
+                   process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     
     if (!apiKey) {
-      return res.status(500).json({ error: "Missing GEMINI_API_KEY. Add it to your server environment variables." });
+      console.error("ENVIRONMENT ERROR: No API Key found in process.env");
+      return res.status(500).json({ 
+        error: "Missing API Key", 
+        details: "Please add GEMINI_API_KEY or GOOGLE_API_KEY in your Vercel Environment Variables." 
+      });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -56,8 +64,11 @@ app.post("/api/generate", async (req, res) => {
         1. 'index.html': Standard entry point using Tailwind CDN.
         2. 'manifest.json': PWA configuration.
         3. 'firebase.ts': Setup and initialization code.
+        4. 'firestore.rules': Security rules if Firestore is being structured.
 
-        Output strictly valid JSON.`,
+        STRICT RULES:
+        - For 'firestore.rules', ensure standard secure patterns (auth != null).
+        - Output strictly valid JSON.`,
       }
     });
 

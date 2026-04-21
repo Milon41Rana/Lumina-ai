@@ -36,6 +36,8 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "motion/react";
+import { saveSession, loadSession } from "./lib/db";
+import { Cloud, Lock, ShieldCheck, Mail, UserPlus, FileJson } from "lucide-react";
 
 // --- Types ---
 interface GeneratedFile {
@@ -81,8 +83,33 @@ export default function App() {
   const [selectedFile, setSelectedFile] = React.useState("index.html");
   const [previewDevice, setPreviewDevice] = React.useState<"mobile" | "desktop">("desktop");
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [saveStatus, setSaveStatus] = React.useState<"saving" | "saved" | "idle">("idle");
 
   const chatEndRef = React.useRef<HTMLDivElement>(null);
+
+  // Persistence: Load
+  React.useEffect(() => {
+    const load = async () => {
+      const data = await loadSession(STORAGE_KEY);
+      if (data) {
+        if (data.generatedFiles) setGeneratedFiles(data.generatedFiles);
+        if (data.messages) setMessages(data.messages);
+      }
+    };
+    load();
+  }, []);
+
+  // Persistence: Save
+  React.useEffect(() => {
+    const save = async () => {
+      setSaveStatus("saving");
+      await saveSession(STORAGE_KEY, { generatedFiles, messages });
+      setTimeout(() => setSaveStatus("saved"), 500);
+    };
+    if (messages.length > 1 || generatedFiles.length > 1) {
+      save();
+    }
+  }, [generatedFiles, messages]);
 
   React.useEffect(() => {
     // Suppress benign platform errors
@@ -166,8 +193,9 @@ export default function App() {
       
       addTerminalLog("Modules Synchronized Successfully");
     } catch (err: any) {
-      addTerminalLog(`ERROR: ${err.message}`);
-      setMessages(prev => [...prev, { role: "model", content: "Error synchronizing architecture. Check system logs." }]);
+      const errorMsg = err.message || "Unknown synchronization error";
+      addTerminalLog(`CRITICAL ERROR: ${errorMsg}`);
+      setMessages(prev => [...prev, { role: "model", content: `Architecture synchronization failed: ${errorMsg}. Please verify your API Key in Vercel Settings.` }]);
     } finally {
       setIsTyping(false);
     }
@@ -219,6 +247,20 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Connected</span>
+          </div>
+          <div className="h-3 w-px bg-gray-200 mx-1" />
+          <div className="flex items-center gap-2">
+            {saveStatus === "saving" ? (
+              <RotateCcw className="w-3 h-3 text-blue-500 animate-spin" />
+            ) : saveStatus === "saved" ? (
+              <CheckCircle2 className="w-3 h-3 text-green-500" />
+            ) : null}
+            <span className={cn(
+              "text-[9px] font-bold uppercase tracking-tight transition-colors",
+              saveStatus === "saving" ? "text-blue-500" : saveStatus === "saved" ? "text-green-600" : "text-slate-300"
+            )}>
+              {saveStatus === "saving" ? "Syncing..." : saveStatus === "saved" ? "Saved" : "Not Synced"}
+            </span>
           </div>
         </div>
 
@@ -414,6 +456,98 @@ export default function App() {
                                 )}
                              </div>
                           </ScrollArea>
+                       </div>
+                    </div>
+                  </motion.div>
+                ) : activeTab === "Integrations" ? (
+                  <motion.div 
+                    key="integrations" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="flex-1 p-8 overflow-y-auto bg-gray-50/10"
+                  >
+                    <div className="max-w-4xl mx-auto space-y-8">
+                       <div className="space-y-2">
+                          <h2 className="text-xl font-black tracking-tight text-slate-900">Cloud Integrations</h2>
+                          <p className="text-sm text-slate-500">Configure external services and database security for this project.</p>
+                       </div>
+
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Firebase Integration */}
+                          <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-6">
+                             <div className="flex items-center gap-4">
+                               <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center">
+                                 <Database className="w-6 h-6 text-orange-500" />
+                               </div>
+                               <div>
+                                 <h3 className="text-sm font-bold text-slate-900">Firebase Firestore</h3>
+                                 <p className="text-[11px] text-slate-400">Database & Real-time Sync</p>
+                               </div>
+                             </div>
+                             
+                             <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                   <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Project Security</label>
+                                   <Button 
+                                     onClick={() => handleSendMessage({ preventDefault: () => {}, target: { value: "Generate Firebase Security Rules for this project based on current features." } } as any)}
+                                     variant="outline" 
+                                     className="w-full h-10 border-blue-100 text-blue-600 hover:bg-blue-50 text-[11px] font-bold gap-2"
+                                   >
+                                     <ShieldCheck className="w-4 h-4" /> Generate firestore.rules
+                                   </Button>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                   <div className="flex items-center gap-2 text-[10px] font-medium text-slate-500">
+                                      <Lock className="w-3 h-3 text-slate-300" />
+                                      <span>Current Role: Owner/Admin (Read-Write)</span>
+                                   </div>
+                                </div>
+                             </div>
+                          </div>
+
+                          {/* Firebase Auth */}
+                          <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm space-y-6">
+                             <div className="flex items-center gap-4">
+                               <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                                 <Key className="w-6 h-6 text-blue-500" />
+                               </div>
+                               <div>
+                                 <h3 className="text-sm font-bold text-slate-900">Firebase Auth</h3>
+                                 <p className="text-[11px] text-slate-400">Identity & Access Control</p>
+                               </div>
+                             </div>
+                             
+                             <div className="grid grid-cols-2 gap-3">
+                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex flex-col items-center gap-2">
+                                  <Mail className="w-4 h-4 text-slate-400" />
+                                  <span className="text-[9px] font-bold uppercase text-slate-500">Email/Pass</span>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex flex-col items-center gap-2">
+                                  <UserPlus className="w-4 h-4 text-slate-400" />
+                                  <span className="text-[9px] font-bold uppercase text-slate-500">Google Auth</span>
+                                </div>
+                             </div>
+                             <Button variant="ghost" className="w-full h-8 text-[10px] font-bold text-blue-600 hover:bg-blue-50">Configure Providers</Button>
+                          </div>
+                          
+                          {/* Export Module */}
+                          <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm md:col-span-2 space-y-4">
+                             <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                   <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center">
+                                     <Cloud className="w-6 h-6 text-slate-500" />
+                                   </div>
+                                   <div>
+                                     <h3 className="text-sm font-bold text-slate-900">VFS Deployment Strategy</h3>
+                                     <p className="text-[11px] text-slate-400">Virtual File System Export & Sync</p>
+                                   </div>
+                                </div>
+                                <div className="flex gap-2">
+                                   <Button variant="outline" className="h-9 px-4 text-[11px] font-bold gap-2">
+                                      <FileJson className="w-4 h-4" /> Download VFS (JSON)
+                                   </Button>
+                                   <Button className="h-9 px-4 bg-slate-900 text-white text-[11px] font-bold">Push to Production</Button>
+                                </div>
+                             </div>
+                          </div>
                        </div>
                     </div>
                   </motion.div>
