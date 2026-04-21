@@ -71,23 +71,31 @@ export default function App() {
   const [messages, setMessages] = React.useState<{ role: "user" | "model"; content: string; actions?: ActionLog }[]>([
     { role: "model", content: "Architecture engine connected. I'm ready to build your full-stack vision." }
   ]);
-  const [terminalLogs, setTerminalLogs] = React.useState<TerminalLog[]>([]);
+  const [terminalLogs, setTerminalLogs] = React.useState<TerminalLog[]>(() => [
+    { id: "1", message: "Build Start", timestamp: new Date().toLocaleTimeString() },
+    { id: "2", message: "Render Start", timestamp: new Date().toLocaleTimeString() },
+    { id: "3", message: "CONNECTED", timestamp: new Date().toLocaleTimeString() },
+    { id: "4", message: "Lumina Engine Ready", timestamp: new Date().toLocaleTimeString() },
+  ]);
   const [previewLogs, setPreviewLogs] = React.useState<TerminalLog[]>([]);
   const [selectedFile, setSelectedFile] = React.useState("index.html");
   const [previewDevice, setPreviewDevice] = React.useState<"mobile" | "desktop">("desktop");
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
 
   const chatEndRef = React.useRef<HTMLDivElement>(null);
-  const initialLogged = React.useRef(false);
 
   React.useEffect(() => {
-    if (!initialLogged.current) {
-      addTerminalLog("Build Start");
-      addTerminalLog("Render Start");
-      addTerminalLog("CONNECTED");
-      addTerminalLog("Lumina Engine Ready");
-      initialLogged.current = true;
-    }
+    // Suppress benign platform errors
+    const handleError = (e: ErrorEvent) => {
+      if (e.message?.includes("WebSocket") || e.message?.includes("[vite]")) e.stopImmediatePropagation();
+    };
+    const handleRejection = (e: PromiseRejectionEvent) => {
+      const msg = e.reason?.message || e.reason || "";
+      if (typeof msg === 'string' && (msg.includes("WebSocket") || msg.includes("vite"))) e.stopImmediatePropagation();
+    };
+    
+    window.addEventListener("error", handleError, true);
+    window.addEventListener("unhandledrejection", handleRejection, true);
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -108,7 +116,11 @@ export default function App() {
       }
     };
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("error", handleError, true);
+      window.removeEventListener("unhandledrejection", handleRejection, true);
+    };
   }, []);
 
   React.useEffect(() => {
