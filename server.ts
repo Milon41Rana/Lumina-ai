@@ -30,12 +30,32 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    const genAI = new GoogleGenAI({ apiKey });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: `You are Lumina AI Studio v2, a world-class Full-Stack Meta-Builder.
+        
+        TASK:
+        Generate a "Virtual File System" (VFS) for high-performance web applications.
+        
+        MANDATORY FILES:
+        1. 'index.html': Main entry point with Tailwind CSS and Font Inter.
+        2. 'manifest.json': Full PWA metadata.
+        3. 'firebase.ts': Modern Firebase v9+ initialization.
+        4. 'firestore.rules': Hardened security rules.
+        5. 'app.js' or 'main.js': The central logic file.
+
+        DESIGN PRINCIPLES:
+        - Use elegant, minimalist UI patterns.
+        - Ensure PWA standards are met.
+        - Code must be production-ready.
+
+        Output strictly valid JSON.`,
+    });
     
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite-preview",
+    const response = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
+      generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {
           type: "OBJECT",
@@ -55,24 +75,10 @@ app.post("/api/generate", async (req, res) => {
           },
           required: ["explanation", "files"]
         },
-        systemInstruction: `You are Lumina AI Studio, a Full-Stack Meta-Builder.
-        
-        TASK:
-        Generate a "Virtual File System" (VFS) based on user instructions.
-        
-        MANDATORY FILES (Must always be included);
-        1. 'index.html': Standard entry point using Tailwind CDN.
-        2. 'manifest.json': PWA configuration.
-        3. 'firebase.ts': Setup and initialization code.
-        4. 'firestore.rules': Security rules if Firestore is being structured.
-
-        STRICT RULES:
-        - For 'firestore.rules', ensure standard secure patterns (auth != null).
-        - Output strictly valid JSON.`,
       }
     });
 
-    const data = JSON.parse(response.text.trim());
+    const data = JSON.parse(response.response.text());
     res.json(data);
   } catch (error: any) {
     console.error("Gemini Server Error:", error);
