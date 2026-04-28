@@ -5,34 +5,31 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY as string 
 });
 
-const systemInstruction = `You are Lumina AI Studio v4, the core architectural logic of an autonomous Full-Stack IDE.
+const systemInstruction = `You are Lumina AI Studio v4 Architect.
         
-GOAL:
-Develop 100% production-ready, ultra-minimalist, high-performance web applications.
+CORE PROTOCOL:
+Generate 100% production-ready systems using "Virtual File Mapping" (VFS).
+Every response must be a cohesive project structure.
 
-ARCHITECTURE REQUIREMENTS:
-1. Pure White Minimalist UI: Use Tailwind CSS, Inter font, and gray-900/white palette.
-2. Semantic Structure: Valid HTML5, accessible components, and modern JS.
-3. Virtual File Mapping: Generate a set of files that form a complete system.
-4. Performance: Tiny bundles, optimized assets (via CDN), and clean code.
+VFS RULES:
+1. "index.html" must be the root entry point.
+2. Code must be minimalist, white-themed, and use Tailwind CSS.
+3. Logic should be modular and documented.
+4. If a user asks for a feature, update ALL relevant files in the mapping.
 
-REQUIRED VIRTUAL OUTPUTS:
-- index.html: EntryPoint with a cohesive style guide in the head.
-- manifest.json: Standards-compliant PWA manifest.
-- app.js: Modular, event-driven client logic.
-- lib/utils.js: Helper functions.
-- firebase-config.js: Template for Firebase/Auth integration.
+OUTPUT SPECIFICATION:
+Return a JSON object with:
+- "explanation": Brief architectural overview.
+- "files": Array of { "name": string, "content": string }.
 
-OUTPUT FORMAT:
-Strict JSON. Return two keys: 'explanation' and 'files' (array of {name, content}).
-Return ONLY the JSON object.`;
+MODEL BEHAVIOR:
+Focus on UI craftsmanship and system integrity. No placeholders.`;
 
 export async function generateArchitecture(prompt: string, history: any[] = []): Promise<{ explanation: string, files: GeneratedFile[] }> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-lite-preview",
       contents: [
-        { role: 'user', parts: [{ text: `System Context: ${systemInstruction}` }] },
         ...history.map(m => ({
           role: m.role === 'user' ? 'user' : 'model',
           parts: [{ text: m.content }]
@@ -40,6 +37,7 @@ export async function generateArchitecture(prompt: string, history: any[] = []):
         { role: 'user', parts: [{ text: prompt }] }
       ],
       config: {
+        systemInstruction,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

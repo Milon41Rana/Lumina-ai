@@ -14,16 +14,16 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
           <Layout className="text-white w-5 h-5" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-gray-900 text-sm tracking-tight leading-none uppercase">Lumina Studio</span>
+          <span className="font-bold text-gray-900 text-sm tracking-tight leading-none uppercase truncate max-w-[100px] md:max-w-none">Lumina Studio</span>
           <div className="flex items-center gap-1.5 mt-0.5">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.3)]" />
             <span className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.1em]">Connected</span>
           </div>
         </div>
         
-        <div className="h-4 w-px bg-gray-200 mx-2" />
+        <div className="h-4 w-px bg-gray-200 mx-1 md:mx-2" />
         
-        <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2">
           {saveStatus === 'saving' ? (
             <RotateCcw className="w-3 h-3 text-blue-500 animate-spin" />
           ) : saveStatus === 'saved' ? (

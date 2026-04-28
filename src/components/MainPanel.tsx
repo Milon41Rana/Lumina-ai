@@ -89,7 +89,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
             );
           })}
         </div>
-        <div className="pr-6 hidden lg:block uppercase font-black text-[9px] text-gray-300 tracking-[0.2em] select-none">
+        <div className="pr-6 hidden xl:block uppercase font-black text-[9px] text-gray-300 tracking-[0.2em] select-none">
           Build Pipeline v4.0 // LMN_RNDR
         </div>
       </div>

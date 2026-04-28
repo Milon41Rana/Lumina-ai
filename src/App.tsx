@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { openDB } from 'idb';
 import JSZip from 'jszip';
+import { Layout } from 'lucide-react';
 import { Navigation } from './components/Navigation';
 import { Sidebar } from './components/Sidebar';
 import { MainPanel } from './components/MainPanel';
@@ -171,8 +172,12 @@ export default function App() {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data.type === 'log') addTerminalLog(`RUNTIME_LOG: ${event.data.message}`);
-      if (event.data.type === 'error') addTerminalLog(`RUNTIME_ERROR: ${event.data.message}`);
+      const msg = event.data.message || '';
+      // Filter out benign system errors from Vite/HMR
+      if (msg.includes('websocket') || msg.includes('HMR') || msg.includes('vite')) return;
+      
+      if (event.data.type === 'log') addTerminalLog(`RUNTIME_LOG: ${msg}`);
+      if (event.data.type === 'error') addTerminalLog(`RUNTIME_ERROR: ${msg}`);
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
@@ -182,16 +187,18 @@ export default function App() {
     <div className="flex flex-col h-screen bg-white font-sans overflow-hidden selection:bg-gray-900 selection:text-white">
       <Navigation saveStatus={saveStatus} />
       
-      <main className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          messages={messages} 
-          input={input} 
-          setInput={setInput} 
-          onSendMessage={handleSendMessage}
-          isTyping={isTyping}
-        />
+      <main className="flex flex-1 overflow-hidden relative">
+        <div className="hidden md:flex shrink-0">
+          <Sidebar 
+            messages={messages} 
+            input={input} 
+            setInput={setInput} 
+            onSendMessage={handleSendMessage}
+            isTyping={isTyping}
+          />
+        </div>
         
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-white">
           <MainPanel 
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -213,6 +220,16 @@ export default function App() {
             logs={terminalLogs} 
             onClear={() => setTerminalLogs([])}
           />
+        </div>
+
+        {/* Mobile Sidebar Overlay (Simplified) */}
+        <div className="md:hidden fixed bottom-4 right-4 z-50">
+           <button 
+             onClick={() => setActiveTab('Preview')}
+             className="w-12 h-12 bg-gray-900 text-white rounded-full shadow-2xl flex items-center justify-center"
+           >
+             <Layout className="w-5 h-5" />
+           </button>
         </div>
       </main>
     </div>
