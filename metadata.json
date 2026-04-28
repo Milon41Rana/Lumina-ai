@@ -1,5 +1,9 @@
 {
-  "name": "Lumina Studio White",
-  "description": "A clean, white-themed AI Website Builder and Full-Stack IDE clone of Google AI Studio.",
-  "requestFramePermissions": []
+  "name": "Lumina AI Studio",
+  "description": "A high-performance, 100% clone of Google AI Studio with full-stack capabilities, PWA support, and real-time coding agents.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
 }
