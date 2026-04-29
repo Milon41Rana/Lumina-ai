@@ -44,31 +44,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ messages, input, setInput, onS
 
             {msg.actions && (
               <motion.div 
-                initial={{ opacity: 0, scale: 0.98 }} 
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm mx-2"
+                initial={{ opacity: 0, y: 10 }} 
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm mx-2 space-y-3"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <History className="w-3.5 h-3.5 text-blue-500" />
-                    Action History
-                  </h4>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-gray-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     <div className="w-5 h-5 bg-green-50 rounded-full flex items-center justify-center">
-                       <CheckCircle2 className="w-3 h-3 text-green-500" />
+                      <CheckCircle2 className="w-3 h-3 text-green-500" />
                     </div>
-                    {msg.actions.action}
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      Modified Files
+                    </span>
                   </div>
-                  <div className="pl-7 space-y-2">
-                    {msg.actions.files.map((file) => (
-                      <div key={file} className="flex items-center gap-2.5 text-[11px] text-gray-500 hover:text-blue-600 cursor-pointer transition-colors">
-                        <FileText className="w-3.5 h-3.5 opacity-40 shrink-0" />
-                        {file}
+                </div>
+                
+                <div className="space-y-2">
+                  {msg.actions.files.map((file) => (
+                    <div 
+                      key={file} 
+                      className="flex items-center gap-2.5 p-2 rounded-lg bg-gray-50/50 hover:bg-gray-50 transition-colors cursor-pointer group"
+                    >
+                      <div className="w-6 h-6 rounded bg-white border border-gray-100 flex items-center justify-center shadow-sm">
+                        <FileText className="w-3 h-3 text-gray-400 group-hover:text-blue-500 transition-colors" />
                       </div>
-                    ))}
-                  </div>
+                      <span className="text-xs font-medium text-gray-600 group-hover:text-gray-900 transition-colors">
+                        {file}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </motion.div>
             )}

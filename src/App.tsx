@@ -111,7 +111,7 @@ export default function App() {
       setMessages(prev => [...prev, { 
         role: 'model', 
         content: data.explanation || 'Architectural changes applied successfully.',
-        actions: data.files ? {
+        actions: (data.files && data.files.length > 0) ? {
           id: Date.now().toString(),
           action: 'Architectural Synthesis',
           files: data.files.map((f: any) => f.name)
