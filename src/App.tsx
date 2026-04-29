@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { openDB } from 'idb';
 import JSZip from 'jszip';
 import { Layout } from 'lucide-react';
@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { MainPanel } from './components/MainPanel';
 import { Terminal } from './components/Terminal';
 import { Message, GeneratedFile, MainTab, TerminalLog } from './types';
+import { SandboxEngine } from './lib/sandbox';
 
 const STORAGE_KEY = 'lumina_studio_v4';
 
@@ -27,6 +28,7 @@ export default function App() {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'idle'>('idle');
   const [commitMessage, setCommitMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const sandboxRef = useRef<SandboxEngine | null>(null);
 
   // --- Persistence ---
   useEffect(() => {
@@ -155,39 +157,30 @@ export default function App() {
   };
 
   const getIframeSource = useCallback(() => {
-    const mainFile = generatedFiles.find(f => f.name === 'index.html');
-    if (!mainFile) return '';
-
-    // Inject console relay script
-    const script = `
-      <script>
-        const originalLog = console.log;
-        const originalError = console.error;
-        console.log = (...args) => {
-          window.parent.postMessage({ type: 'log', message: args.join(' ') }, '*');
-          originalLog.apply(console, args);
-        };
-        console.error = (...args) => {
-          window.parent.postMessage({ type: 'error', message: args.join(' ') }, '*');
-          originalError.apply(console, args);
-        };
-        window.onerror = (msg, url, line) => {
-          window.parent.postMessage({ type: 'error', message: \`Unhandled Error: \${msg} at \${line}\` }, '*');
-        };
-      </script>
-    `;
-
-    return mainFile.content.replace('</head>', `${script}</head>`);
+    if (sandboxRef.current) {
+      sandboxRef.current.destroy();
+    }
+    sandboxRef.current = new SandboxEngine(generatedFiles);
+    return sandboxRef.current.generateSrcDoc();
   }, [generatedFiles]);
 
   useEffect(() => {
+    return () => {
+      if (sandboxRef.current) {
+        sandboxRef.current.destroy();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      const msg = event.data.message || '';
-      // Filter out benign system errors from Vite/HMR
-      if (msg.includes('websocket') || msg.includes('HMR') || msg.includes('vite')) return;
-      
-      if (event.data.type === 'log') addTerminalLog(`RUNTIME_LOG: ${msg}`);
-      if (event.data.type === 'error') addTerminalLog(`RUNTIME_ERROR: ${msg}`);
+      const data = event.data;
+      if (data.type === 'runtime_event') {
+        const { type, message } = data.payload;
+        if (type === 'log') addTerminalLog(`RUNTIME_LOG: ${message}`);
+        if (type === 'error') addTerminalLog(`RUNTIME_ERROR: ${message}`);
+        if (type === 'warn') addTerminalLog(`RUNTIME_WARN: ${message}`);
+      }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);

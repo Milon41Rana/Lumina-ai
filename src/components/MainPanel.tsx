@@ -30,7 +30,10 @@ export const MainPanel: React.FC<MainPanelProps> = ({
   onUpdateFile
 }) => {
   const [isSaving, setIsSaving] = React.useState(false);
+  const [refreshKey, setRefreshKey] = React.useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
   const getLanguage = (fileName: string) => {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -157,7 +160,10 @@ export const MainPanel: React.FC<MainPanelProps> = ({
                      </button>
                   </div>
                   <div className="flex items-center gap-4">
-                     <RotateCcw className="w-4 h-4 text-gray-300 hover:text-gray-900 cursor-pointer transition-colors" />
+                     <RotateCcw 
+                        onClick={handleRefresh}
+                        className="w-4 h-4 text-gray-300 hover:text-gray-900 cursor-pointer transition-colors active:rotate-180" 
+                     />
                      <ExternalLink className="w-4 h-4 text-gray-300 hover:text-gray-900 cursor-pointer transition-colors" />
                   </div>
                </div>
@@ -174,7 +180,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
                       </div>
                     )}
                     <iframe 
-                       key={generatedFiles.length}
+                       key={`${generatedFiles.length}-${refreshKey}`}
                        srcDoc={getIframeSource()}
                        sandbox="allow-scripts allow-forms allow-modals allow-popups allow-presentation"
                        className="w-full h-full border-none"
