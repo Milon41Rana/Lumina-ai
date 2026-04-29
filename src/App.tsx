@@ -7,7 +7,6 @@ import { Sidebar } from './components/Sidebar';
 import { MainPanel } from './components/MainPanel';
 import { Terminal } from './components/Terminal';
 import { Message, GeneratedFile, MainTab, TerminalLog } from './types';
-import { generateArchitecture } from './services/geminiService';
 
 const STORAGE_KEY = 'lumina_studio_v4';
 
@@ -83,7 +82,18 @@ export default function App() {
     addTerminalLog(`USER_SIGNAL: ${input.slice(0, 30)}...`);
 
     try {
-      const data = await generateArchitecture(input, messages);
+      const response = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: input, history: messages.concat(userMessage) }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to generate');
+      }
+
+      const data = await response.json();
       
       if (data.files && data.files.length > 0) {
         setGeneratedFiles(prev => {

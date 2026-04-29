@@ -9,9 +9,71 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 
-// API routes can be added here (e.g., GitHub, Deployment)
+// API route to handle Gemini generation for VFS mapping
+const systemInstruction = `You are Lumina AI Studio v4 Architect.
+        
+CORE PROTOCOL:
+Generate 100% production-ready systems using "Virtual File Mapping" (VFS).
+Every response must be a cohesive project structure.
+
+VFS RULES:
+1. "index.html" must be the root entry point.
+2. Code must be minimalist, white-themed, and use Tailwind CSS.
+3. Logic should be modular and documented.
+4. If a user asks for a feature, update ALL relevant files in the mapping.
+
+OUTPUT SPECIFICATION:
+Return a JSON object with:
+- "explanation": Brief architectural overview.
+- "files": Array of { "name": string, "content": string }.
+
+MODEL BEHAVIOR:
+Focus on UI craftsmanship and system integrity. No placeholders.`;
+
+app.post("/api/generate", async (req, res) => {
+  try {
+    const { prompt, history } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "GEMINI_API_KEY is not configured on the server." });
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash", 
+      systemInstruction: systemInstruction 
+    });
+
+    const chat = model.startChat({
+      history: (history || []).map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'model',
+        parts: [{ text: m.content }]
+      })),
+    });
+
+    const result = await chat.sendMessage(prompt);
+    const response = await result.response;
+    let text = response.text();
+    
+    // Clean JSON from potential markdown tags
+    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    
+    try {
+      const data = JSON.parse(text);
+      res.json(data);
+    } catch (parseError) {
+      console.error("Parse Error:", text);
+      res.status(500).json({ error: "Failed to parse AI response as JSON", raw: text });
+    }
+  } catch (error: any) {
+    console.error("Gemini Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/api/health", (req, res) => {
-  res.json({ status: "Architect server online" });
+  res.json({ status: "Architect server online", model: "Gemini 1.5 Flash" });
 });
 
 // Handle Frontend
@@ -34,6 +96,14 @@ if (process.env.NODE_ENV !== "production") {
   app.use(express.static(distPath));
   app.get("*", (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+// In some environments, we don't call listen, or it's handled by the platform
+if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
+  const PORT = Number(process.env.PORT) || 3000;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Production server running on port ${PORT}`);
   });
 }
 

@@ -24,6 +24,9 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
         <div className="h-4 w-px bg-gray-200 mx-1 md:mx-2" />
         
         <div className="hidden sm:flex items-center gap-2">
+          <div className="px-2 py-0.5 bg-gray-50 border border-gray-100 rounded-md">
+            <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Engine: Gemini 3.1 Flash Lite</span>
+          </div>
           {saveStatus === 'saving' ? (
             <RotateCcw className="w-3 h-3 text-blue-500 animate-spin" />
           ) : saveStatus === 'saved' ? (
