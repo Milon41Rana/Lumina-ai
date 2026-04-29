@@ -1,9 +1,10 @@
 import React, { useRef, useEffect } from 'react';
-import { Eye, Code, Globe, Shield, Settings, Github, Monitor, Smartphone, RotateCcw, ExternalLink, Download, FileCode, File, Layers, Activity, AlertCircle, Check, Save } from 'lucide-react';
-import { MainTab, GeneratedFile, TerminalLog } from '../types';
+import { Eye, Code, Globe, Shield, Settings, Github, Monitor, Smartphone, RotateCcw, ExternalLink, Download, FileCode, File, Layers, Activity, AlertCircle, UserCircle, Save, WifiOff } from 'lucide-react';
+import { MainTab, GeneratedFile, TerminalLog, UserProfile as UserProfileType } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import Editor from '@monaco-editor/react';
+import { UserProfile } from './UserProfile';
 
 interface MainPanelProps {
   activeTab: MainTab;
@@ -22,13 +23,16 @@ interface MainPanelProps {
   onDownloadZip: () => void;
   onUpdateFile: (name: string, content: string) => void;
   terminalLogs: TerminalLog[];
+  userProfile: UserProfileType | null;
+  onUpdateProfile: (profile: UserProfileType) => void;
+  isOffline: boolean;
 }
 
 export const MainPanel: React.FC<MainPanelProps> = ({ 
   activeTab, setActiveTab, generatedFiles, selectedFile, setSelectedFile, 
   previewDevice, setPreviewDevice, isTyping, getIframeSource,
   commitMessage, setCommitMessage, onGitHubSync, isSyncing, onDownloadZip,
-  onUpdateFile, terminalLogs
+  onUpdateFile, terminalLogs, userProfile, onUpdateProfile, isOffline
 }) => {
   const [device, setDevice] = React.useState<'desktop' | 'mobile'>('desktop');
   const [consolePinned, setConsolePinned] = React.useState(true);
@@ -74,6 +78,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
   const tabs: { name: MainTab, icon: any }[] = [
     { name: 'Preview', icon: Eye },
     { name: 'Code', icon: Code },
+    { name: 'Profile', icon: UserCircle },
     { name: 'Versions', icon: Settings },
     { name: 'Secrets', icon: Shield },
     { name: 'Integrations', icon: Globe },
@@ -154,6 +159,12 @@ export const MainPanel: React.FC<MainPanelProps> = ({
               }}
               className="flex-1 h-full flex flex-col p-6 overflow-hidden"
             >
+               {isOffline && (
+                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-xs font-bold uppercase tracking-widest animate-in slide-in-from-top-2">
+                   <WifiOff className="w-4 h-4" />
+                   Browser is Offline - Local sync active (IndexedDB)
+                 </div>
+               )}
                <div className="h-14 mb-4 flex items-center justify-between bg-white border border-gray-100 rounded-2xl px-6 shrink-0 shadow-sm">
                   <div className="flex items-center gap-8">
                      <div className="flex items-center gap-2 p-1 bg-gray-100/50 rounded-xl">
@@ -271,6 +282,24 @@ export const MainPanel: React.FC<MainPanelProps> = ({
                     )}
                   </AnimatePresence>
                </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'Profile' && (
+            <motion.div 
+              key="profile" 
+              custom={activeTabIndex}
+              variants={variants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                x: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 }
+              }}
+              className="flex-1 h-full overflow-y-auto bg-white"
+            >
+              <UserProfile profile={userProfile} onUpdate={onUpdateProfile} />
             </motion.div>
           )}
 

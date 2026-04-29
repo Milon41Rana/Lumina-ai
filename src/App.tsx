@@ -1,27 +1,23 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { openDB } from 'idb';
 import JSZip from 'jszip';
-import { Layout } from 'lucide-react';
+import { Layout, WifiOff, Wifi } from 'lucide-react';
 import { Navigation } from './components/Navigation';
 import { Sidebar } from './components/Sidebar';
 import { MainPanel } from './components/MainPanel';
 import { Terminal } from './components/Terminal';
-import { Message, GeneratedFile, MainTab, TerminalLog } from './types';
+import { Message, GeneratedFile, MainTab, TerminalLog, UserProfile } from './types';
 import { SandboxEngine } from './lib/sandbox';
-
-const STORAGE_KEY = 'lumina_studio_v4';
+import { dbService } from './lib/db';
+import { useOffline } from './hooks/useOffline';
 
 export default function App() {
   // --- State ---
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'model', content: 'Architect instance ready. Describe the production system you want to build.' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [activeTab, setActiveTab] = useState<MainTab>('Preview');
-  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([
-    { name: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head>\n  <script src="https://cdn.tailwindcss.com"></script>\n</head>\n<body class="bg-white flex items-center justify-center h-screen">\n  <h1 class="text-4xl font-black text-gray-900 tracking-tighter uppercase">Genesis Node Active</h1>\n</body>\n</html>' }
-  ]);
+  const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [selectedFile, setSelectedFile] = useState('index.html');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('desktop');
   const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
@@ -29,39 +25,44 @@ export default function App() {
   const [commitMessage, setCommitMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const sandboxRef = useRef<SandboxEngine | null>(null);
+  const isOffline = useOffline();
 
   // --- Persistence ---
   useEffect(() => {
-    const loadState = async () => {
-      const db = await openDB(STORAGE_KEY, 1, {
-        upgrade(db) {
-          db.createObjectStore('state');
-        },
-      });
-      const savedMessages = await db.get('state', 'messages');
-      const savedFiles = await db.get('state', 'files');
-      if (savedMessages) setMessages(savedMessages);
-      if (savedFiles) {
-        setGeneratedFiles(savedFiles);
-        setSelectedFile(savedFiles[0].name);
+    const loadData = async () => {
+      const state = await dbService.loadState();
+      setMessages(state.messages);
+      setGeneratedFiles(state.generatedFiles);
+      setUserProfile(state.userProfile);
+      if (state.generatedFiles.length > 0) {
+        setSelectedFile(state.generatedFiles[0].name);
       }
     };
-    loadState();
+    loadData();
   }, []);
 
   useEffect(() => {
-    const saveState = async () => {
+    const saveData = async () => {
+      if (messages.length === 0 && generatedFiles.length === 0) return;
+      
       setSaveStatus('saving');
-      const db = await openDB(STORAGE_KEY, 1);
-      await db.put('state', messages, 'messages');
-      await db.put('state', generatedFiles, 'files');
+      await dbService.saveState({
+        messages,
+        generatedFiles,
+        userProfile
+      });
       setTimeout(() => setSaveStatus('saved'), 500);
       setTimeout(() => setSaveStatus('idle'), 2000);
     };
-    if (messages.length > 1 || generatedFiles.length > 1) {
-      saveState();
-    }
-  }, [messages, generatedFiles]);
+
+    const timeout = setTimeout(saveData, 1000);
+    return () => clearTimeout(timeout);
+  }, [messages, generatedFiles, userProfile]);
+
+  const handleUpdateProfile = (profile: UserProfile) => {
+    setUserProfile(profile);
+    addTerminalLog('PROFILE_UPDATED: Local identity synced to IndexedDB', 'system');
+  };
 
   // --- Handlers ---
   const addTerminalLog = (message: string, type: TerminalLog['type'] = 'system') => {
@@ -189,7 +190,12 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen bg-white font-sans overflow-hidden selection:bg-gray-900 selection:text-white">
-      <Navigation saveStatus={saveStatus} />
+      <Navigation 
+        saveStatus={saveStatus} 
+        isOffline={isOffline} 
+        userProfile={userProfile}
+        onOpenProfile={() => setActiveTab('Profile')}
+      />
       
       <main className="flex flex-1 overflow-hidden relative">
         <div className="hidden md:flex shrink-0">
@@ -220,6 +226,9 @@ export default function App() {
             onDownloadZip={handleDownloadZip}
             onUpdateFile={handleUpdateFile}
             terminalLogs={terminalLogs}
+            userProfile={userProfile}
+            onUpdateProfile={handleUpdateProfile}
+            isOffline={isOffline}
           />
           <Terminal 
             logs={terminalLogs} 

@@ -22,4 +22,11 @@ export interface Message {
   actions?: ActionLog;
 }
 
-export type MainTab = 'Preview' | 'Code' | 'Versions' | 'Secrets' | 'Integrations' | 'GitHub';
+export type MainTab = 'Preview' | 'Code' | 'Versions' | 'Secrets' | 'Integrations' | 'GitHub' | 'Profile';
+
+export interface UserProfile {
+  name: string;
+  email: string;
+  avatar?: string;
+  bio?: string;
+}

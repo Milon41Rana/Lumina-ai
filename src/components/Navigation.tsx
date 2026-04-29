@@ -4,9 +4,12 @@ import { cn } from '../lib/utils';
 
 interface NavigationProps {
   saveStatus: 'saving' | 'saved' | 'idle';
+  isOffline: boolean;
+  userProfile: UserProfile | null;
+  onOpenProfile: () => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
+export const Navigation: React.FC<NavigationProps> = ({ saveStatus, isOffline, userProfile, onOpenProfile }) => {
   return (
     <nav className="h-14 border-b border-gray-100 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
       <div className="flex items-center gap-4">
@@ -16,8 +19,13 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
         <div className="flex flex-col">
           <span className="font-bold text-gray-900 text-sm tracking-tight leading-none uppercase truncate max-w-[100px] md:max-w-none">Lumina Studio</span>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.3)]" />
-            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.1em]">Connected</span>
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.3)]",
+              isOffline ? "bg-red-500 shadow-red-500/30" : "bg-green-500"
+            )} />
+            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-[0.1em]">
+              {isOffline ? 'Offline' : 'Connected'}
+            </span>
           </div>
         </div>
         
@@ -36,7 +44,7 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
             "text-[9px] font-bold uppercase tracking-widest transition-colors",
             saveStatus === 'saving' ? "text-blue-500" : saveStatus === 'saved' ? "text-green-600" : "text-gray-300"
           )}>
-            {saveStatus === 'saving' ? "Syncing..." : saveStatus === 'saved' ? "Saved" : "Cloud Ready"}
+            {saveStatus === 'saving' ? "Syncing..." : saveStatus === 'saved' ? "Saved (IDB)" : "Ready"}
           </span>
         </div>
       </div>
@@ -54,9 +62,16 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus }) => {
           Publish
         </button>
         <div className="w-px h-6 bg-gray-100 mx-1" />
-        <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-          RA
-        </div>
+        <button 
+          onClick={onOpenProfile}
+          className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 hover:border-gray-400 transition-all overflow-hidden"
+        >
+          {userProfile?.avatar ? (
+            <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            userProfile?.name?.slice(0, 2).toUpperCase() || 'RA'
+          )}
+        </button>
       </div>
     </nav>
   );
