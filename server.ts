@@ -1,7 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,29 +36,34 @@ app.post("/api/generate", async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey || apiKey === "") {
-      console.error("CRITICAL: API Key is missing from environment variables (GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY).");
+      console.error("CRITICAL: API Key is missing from environment variables.");
       return res.status(500).json({ 
         error: "API Key is not configured.",
-        suggestion: "Please add GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY to your project environment."
+        suggestion: "Please add GEMINI_API_KEY to your project environment."
       });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash-8b", 
-      systemInstruction: systemInstruction 
+    const ai = new GoogleGenAI({ apiKey });
+    
+    let mappedHistory = (history || []).map((m: any) => ({
+      role: m.role === 'user' ? 'user' : 'model',
+      parts: [{ text: m.content }]
+    }));
+
+    // Ensure history starts with 'user' role
+    while (mappedHistory.length > 0 && mappedHistory[0].role !== 'user') {
+      mappedHistory.shift();
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite-preview",
+      contents: mappedHistory.length > 0 ? [...mappedHistory, { role: "user", parts: [{ text: prompt }] }] : [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        systemInstruction: systemInstruction
+      }
     });
 
-    const chat = model.startChat({
-      history: (history || []).map((m: any) => ({
-        role: m.role === 'user' ? 'user' : 'model',
-        parts: [{ text: m.content }]
-      })),
-    });
-
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    let text = response.text();
+    let text = response.text || "";
     
     // Clean JSON from potential markdown tags
     text = text.replace(/```json/g, "").replace(/```/g, "").trim();
