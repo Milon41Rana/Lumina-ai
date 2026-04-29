@@ -13,6 +13,7 @@ export interface TerminalLog {
   id: string;
   message: string;
   timestamp: string;
+  type?: 'log' | 'error' | 'warn' | 'system';
 }
 
 export interface Message {

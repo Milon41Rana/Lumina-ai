@@ -64,10 +64,11 @@ export default function App() {
   }, [messages, generatedFiles]);
 
   // --- Handlers ---
-  const addTerminalLog = (message: string) => {
-    const newLog = {
+  const addTerminalLog = (message: string, type: TerminalLog['type'] = 'system') => {
+    const newLog: TerminalLog = {
       id: Date.now().toString(),
       message,
+      type,
       timestamp: new Date().toLocaleTimeString([], { hour12: false })
     };
     setTerminalLogs(prev => [...prev.slice(-100), newLog]);
@@ -81,7 +82,7 @@ export default function App() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsTyping(true);
-    addTerminalLog(`USER_SIGNAL: ${input.slice(0, 30)}...`);
+    addTerminalLog(`USER_SIGNAL: ${input.slice(0, 30)}...`, 'system');
 
     try {
       const response = await fetch('/api/generate', {
@@ -107,7 +108,7 @@ export default function App() {
           });
           return newFiles;
         });
-        addTerminalLog(`VFS_SYNC: ${data.files.length} units modified`);
+        addTerminalLog(`VFS_SYNC: ${data.files.length} units modified`, 'system');
       }
 
       setMessages(prev => [...prev, { 
@@ -120,9 +121,9 @@ export default function App() {
         } : undefined
       }]);
       
-      addTerminalLog('MODEL_CALLBACK_SUCCESS: 200 OK');
+      addTerminalLog('MODEL_CALLBACK_SUCCESS: 200 OK', 'system');
     } catch (error) {
-      addTerminalLog(`FATAL_ERROR: VFS_SYNC_FAILED - ${error}`);
+      addTerminalLog(`FATAL_ERROR: VFS_SYNC_FAILED - ${error}`, 'error');
       setMessages(prev => [...prev, { role: 'model', content: 'Connection to architect failed. Retrying sync...' }]);
     } finally {
       setIsTyping(false);
@@ -131,16 +132,16 @@ export default function App() {
 
   const handleGitHubSync = async () => {
     setIsSyncing(true);
-    addTerminalLog(`GIT_BRIDGE_INIT: ${commitMessage}`);
+    addTerminalLog(`GIT_BRIDGE_INIT: ${commitMessage}`, 'system');
     // Simulate API call
     await new Promise(r => setTimeout(r, 2000));
     setIsSyncing(false);
     setCommitMessage('');
-    addTerminalLog('GIT_PUSH_SUCCESS: Release tagged as v1.0.' + Date.now().toString().slice(-3));
+    addTerminalLog('GIT_PUSH_SUCCESS: Release tagged as v1.0.' + Date.now().toString().slice(-3), 'system');
   };
 
   const handleDownloadZip = async () => {
-    addTerminalLog('ZIP_PACKAGING_START');
+    addTerminalLog('ZIP_PACKAGING_START', 'system');
     const zip = new JSZip();
     generatedFiles.forEach(file => zip.file(file.name, file.content));
     const content = await zip.generateAsync({ type: 'blob' });
@@ -149,7 +150,7 @@ export default function App() {
     link.href = url;
     link.download = `lumina-project-${Date.now()}.zip`;
     link.click();
-    addTerminalLog('ZIP_DOWNLOAD_READY');
+    addTerminalLog('ZIP_DOWNLOAD_READY', 'system');
   };
 
   const handleUpdateFile = (name: string, content: string) => {
@@ -177,9 +178,9 @@ export default function App() {
       const data = event.data;
       if (data.type === 'runtime_event') {
         const { type, message } = data.payload;
-        if (type === 'log') addTerminalLog(`RUNTIME_LOG: ${message}`);
-        if (type === 'error') addTerminalLog(`RUNTIME_ERROR: ${message}`);
-        if (type === 'warn') addTerminalLog(`RUNTIME_WARN: ${message}`);
+        if (type === 'log') addTerminalLog(message, 'log');
+        if (type === 'error') addTerminalLog(message, 'error');
+        if (type === 'warn') addTerminalLog(message, 'warn');
       }
     };
     window.addEventListener('message', handleMessage);
@@ -218,6 +219,7 @@ export default function App() {
             isSyncing={isSyncing}
             onDownloadZip={handleDownloadZip}
             onUpdateFile={handleUpdateFile}
+            terminalLogs={terminalLogs}
           />
           <Terminal 
             logs={terminalLogs} 
