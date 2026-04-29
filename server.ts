@@ -41,7 +41,7 @@ app.post("/api/generate", async (req, res) => {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash", 
+      model: "gemini-1.5-flash-8b", 
       systemInstruction: systemInstruction 
     });
 
@@ -73,7 +73,7 @@ app.post("/api/generate", async (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "Architect server online", model: "Gemini 1.5 Flash" });
+  res.json({ status: "Architect server online", model: "Gemini 3.1 Flash Lite" });
 });
 
 // Handle Frontend
