@@ -1,8 +1,9 @@
-import React from 'react';
-import { Eye, Code, Globe, Shield, Settings, Github, Monitor, Smartphone, RotateCcw, ExternalLink, Download, FileCode, File, Layers, Activity, AlertCircle, Check } from 'lucide-react';
+import React, { useRef, useEffect } from 'react';
+import { Eye, Code, Globe, Shield, Settings, Github, Monitor, Smartphone, RotateCcw, ExternalLink, Download, FileCode, File, Layers, Activity, AlertCircle, Check, Save } from 'lucide-react';
 import { MainTab, GeneratedFile } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
+import Editor from '@monaco-editor/react';
 
 interface MainPanelProps {
   activeTab: MainTab;
@@ -28,6 +29,41 @@ export const MainPanel: React.FC<MainPanelProps> = ({
   commitMessage, setCommitMessage, onGitHubSync, isSyncing, onDownloadZip,
   onUpdateFile
 }) => {
+  const [isSaving, setIsSaving] = React.useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const getLanguage = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    switch (ext) {
+      case 'ts':
+      case 'tsx': return 'typescript';
+      case 'js':
+      case 'jsx': return 'javascript';
+      case 'css': return 'css';
+      case 'html': return 'html';
+      case 'json': return 'json';
+      default: return 'plaintext';
+    }
+  };
+
+  const handleEditorChange = (value: string | undefined) => {
+    if (value !== undefined) {
+      onUpdateFile(selectedFile, value);
+      
+      // Visual indicator for "Auto-saving"
+      setIsSaving(true);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        setIsSaving(false);
+      }, 1000);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, []);
   const tabs: { name: MainTab, icon: any }[] = [
     { name: 'Preview', icon: Eye },
     { name: 'Code', icon: Code },
@@ -268,20 +304,47 @@ export const MainPanel: React.FC<MainPanelProps> = ({
                     <span className="text-[10px] font-black text-gray-900 uppercase tracking-[0.2em]">{selectedFile}</span>
                     <span className="text-[9px] text-gray-300 font-bold uppercase tracking-widest italic opacity-50">VFS_SYMMETRIC_ENCRYPTED</span>
                  </div>
-                 <div className="flex-1 p-10 bg-gray-50/5 overflow-y-auto">
-                    <div className="relative h-full">
-                       <textarea
-                         value={generatedFiles.find(f => f.name === selectedFile)?.content || ''}
-                         onChange={(e) => onUpdateFile(selectedFile, e.target.value)}
-                         spellCheck={false}
-                         className="w-full h-[600px] font-mono text-[13px] leading-[1.8] text-gray-700 bg-white border border-gray-100 p-12 rounded-[2.5rem] shadow-2xl shadow-gray-100 outline-none resize-none selection:bg-blue-100"
-                       />
-                       <div className="absolute top-6 right-6 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Live Sync</span>
-                       </div>
+                  <div className="flex-1 bg-white relative overflow-hidden">
+                    <Editor
+                      height="100%"
+                      language={getLanguage(selectedFile)}
+                      value={generatedFiles.find(f => f.name === selectedFile)?.content || ''}
+                      onChange={handleEditorChange}
+                      theme="light"
+                      options={{
+                        fontSize: 13,
+                        lineHeight: 1.8,
+                        fontFamily: 'JetBrains Mono, monospace',
+                        minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
+                        padding: { top: 40, bottom: 40 },
+                        smoothScrolling: true,
+                        cursorBlinking: 'smooth',
+                        cursorSmoothCaretAnimation: 'on',
+                        selectionHighlight: true,
+                        occurrencesHighlight: 'off',
+                        renderLineHighlight: 'none',
+                        hideCursorInOverviewRuler: true,
+                        scrollbar: {
+                          vertical: 'hidden',
+                          horizontal: 'hidden'
+                        }
+                      }}
+                    />
+                    <div className="absolute top-6 right-8 flex items-center gap-3 z-10">
+                      <div className={cn(
+                        "flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-500",
+                        isSaving ? "bg-blue-50 text-blue-600 scale-100 opacity-100" : "bg-green-50 text-green-600 scale-95 opacity-0"
+                      )}>
+                         <Save className="w-3 h-3 animate-bounce" />
+                         <span className="text-[9px] font-black uppercase tracking-widest">Auto Saving</span>
+                      </div>
+                      <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full border border-gray-100 shadow-sm">
+                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Connected</span>
+                      </div>
                     </div>
-                 </div>
+                  </div>
               </div>
             </motion.div>
           )}
