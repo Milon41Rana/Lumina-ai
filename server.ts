@@ -33,13 +33,13 @@ Focus on UI craftsmanship and system integrity. No placeholders.`;
 app.post("/api/generate", async (req, res) => {
   try {
     const { prompt, history } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey || apiKey === "") {
-      console.error("CRITICAL: GEMINI_API_KEY is missing from environment variables.");
+      console.error("CRITICAL: API Key is missing from environment variables (GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY).");
       return res.status(500).json({ 
-        error: "GEMINI_API_KEY is not configured.",
-        suggestion: "Please add GEMINI_API_KEY to your project secrets in AI Studio settings."
+        error: "API Key is not configured.",
+        suggestion: "Please add GEMINI_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY to your project environment."
       });
     }
 
