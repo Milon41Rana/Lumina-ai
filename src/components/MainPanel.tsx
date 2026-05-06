@@ -50,6 +50,26 @@ export const MainPanel: React.FC<MainPanelProps> = ({
   const [refreshKey, setRefreshKey] = React.useState(0);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const tabs: { name: MainTab, icon: any }[] = [
+    { name: 'Preview', icon: Eye },
+    { name: 'Code', icon: Code },
+    { name: 'Profile', icon: UserCircle },
+    { name: 'GitHub', icon: Github },
+  ];
+
+  const activeTabIndex = tabs.findIndex(t => t.name === activeTab);
+  const [[page, direction], setPage] = React.useState([activeTabIndex, 0]);
+
+  useEffect(() => {
+    setPage((prev) => {
+      const prevPage = prev[0];
+      if (activeTabIndex !== prevPage) {
+        return [activeTabIndex, activeTabIndex > prevPage ? 1 : -1];
+      }
+      return prev;
+    });
+  }, [activeTabIndex]);
+
   const handleRefresh = () => setRefreshKey(prev => prev + 1);
 
   const getLanguage = (fileName: string) => {
@@ -84,17 +104,6 @@ export const MainPanel: React.FC<MainPanelProps> = ({
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, []);
-  const tabs: { name: MainTab, icon: any }[] = [
-    { name: 'Preview', icon: Eye },
-    { name: 'Code', icon: Code },
-    { name: 'Profile', icon: UserCircle },
-    { name: 'Versions', icon: Settings },
-    { name: 'Secrets', icon: Shield },
-    { name: 'Integrations', icon: Globe },
-    { name: 'GitHub', icon: Github },
-  ];
-
-  const activeTabIndex = tabs.findIndex(t => t.name === activeTab);
 
   const variants = {
     enter: (direction: number) => ({
@@ -153,11 +162,11 @@ export const MainPanel: React.FC<MainPanelProps> = ({
 
       {/* Content Area */}
       <div className="flex-1 relative bg-gray-50/10 overflow-hidden">
-        <AnimatePresence mode="wait" custom={activeTabIndex}>
+        <AnimatePresence mode="wait" custom={direction}>
           {activeTab === 'Preview' && (
             <motion.div 
               key="preview" 
-              custom={activeTabIndex}
+              custom={direction}
               variants={variants}
               initial="enter"
               animate="center"
@@ -297,7 +306,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
           {activeTab === 'Profile' && (
             <motion.div 
               key="profile" 
-              custom={activeTabIndex}
+              custom={direction}
               variants={variants}
               initial="enter"
               animate="center"
@@ -315,7 +324,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
           {activeTab === 'GitHub' && (
             <motion.div 
               key="github" 
-              custom={activeTabIndex}
+              custom={direction}
               variants={variants}
               initial="enter"
               animate="center"
@@ -588,7 +597,7 @@ export const MainPanel: React.FC<MainPanelProps> = ({
           {activeTab === 'Code' && (
             <motion.div 
               key="code" 
-              custom={activeTabIndex}
+              custom={direction}
               variants={variants}
               initial="enter"
               animate="center"
@@ -667,10 +676,10 @@ export const MainPanel: React.FC<MainPanelProps> = ({
             </motion.div>
           )}
 
-          {(!['Preview', 'GitHub', 'Code'].includes(activeTab)) && (
+          {(!['Preview', 'GitHub', 'Code', 'Profile'].includes(activeTab)) && (
             <motion.div 
               key="empty" 
-              custom={activeTabIndex}
+              custom={direction}
               variants={variants}
               initial="enter"
               animate="center"

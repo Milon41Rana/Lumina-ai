@@ -312,7 +312,8 @@ app.post("/api/generate", async (req, res) => {
             ? [...mappedHistory, { role: "user", parts: [{ text: prompt }] }] 
             : [{ role: "user", parts: [{ text: prompt }] }],
           config: {
-            systemInstruction: systemInstruction
+            systemInstruction: systemInstruction,
+            responseMimeType: "application/json"
           }
         });
         break; // Success, exit loop
@@ -338,10 +339,17 @@ app.post("/api/generate", async (req, res) => {
       }
     }
 
-    let text = response?.text || "";
+    let text = response?.text || "{}";
     
     // Clean JSON from potential markdown tags
-    text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    
+    // Attempt to extract purely the JSON object if there's any surrounding text
+    const startIndex = text.indexOf('{');
+    const endIndex = text.lastIndexOf('}');
+    if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+      text = text.substring(startIndex, endIndex + 1);
+    }
     
     try {
       const data = JSON.parse(text);
