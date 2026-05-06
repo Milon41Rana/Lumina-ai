@@ -5,7 +5,7 @@ import { Navigation } from './components/Navigation';
 import { Sidebar } from './components/Sidebar';
 import { MainPanel } from './components/MainPanel';
 import { Terminal } from './components/Terminal';
-import { Message, GeneratedFile, MainTab, TerminalLog, UserProfile } from './types';
+import { Message, GeneratedFile, MainTab, TerminalLog, UserProfile, GitHubUser, GitHubRepo } from './types';
 import { SandboxEngine } from './lib/sandbox';
 import { dbService } from './lib/db';
 import { useOffline } from './hooks/useOffline';
@@ -18,13 +18,18 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<MainTab>('Preview');
   const [generatedFiles, setGeneratedFiles] = useState<GeneratedFile[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [githubUser, setGithubUser] = useState<GitHubUser | null>(null);
+  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState('index.html');
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('desktop');
   const [terminalLogs, setTerminalLogs] = useState<TerminalLog[]>([]);
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'idle'>('idle');
   const [commitMessage, setCommitMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [previewSrcDoc, setPreviewSrcDoc] = useState('');
   const sandboxRef = useRef<SandboxEngine | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(false);
   const isOffline = useOffline();
 
   // --- Persistence ---
@@ -37,8 +42,137 @@ export default function App() {
       if (state.generatedFiles.length > 0) {
         setSelectedFile(state.generatedFiles[0].name);
       }
+
+      // Check current GitHub session
+      checkGitHubSession();
     };
     loadData();
+  }, []);
+
+  const checkGitHubSession = async (retries = 3) => {
+    setIsCheckingSession(true);
+    try {
+      addTerminalLog('GITHUB_AUTH: Verifying session state...', 'system');
+      const res = await fetch('/api/auth/github/me', { 
+        credentials: 'include',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      const data = await res.json();
+      
+      if (data.authenticated) {
+        setGithubUser(data.user);
+        addTerminalLog(`GITHUB_AUTH: Session established for ${data.user.login}`, 'system');
+        fetchGitHubRepos();
+        setIsCheckingSession(false);
+        return true;
+      } else if (retries > 0) {
+        addTerminalLog(`GITHUB_AUTH: Handshake pending, retrying... (${retries} left)`, 'warn');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return checkGitHubSession(retries - 1);
+      } else {
+        addTerminalLog('GITHUB_AUTH: No active session found.', 'log');
+        setIsCheckingSession(false);
+        return false;
+      }
+    } catch (e) {
+      addTerminalLog('GITHUB_AUTH_ERROR: Verification sequence interrupted', 'error');
+      setIsCheckingSession(false);
+      return false;
+    }
+  };
+
+  const fetchGitHubRepos = async () => {
+    try {
+      addTerminalLog('GITHUB_API: Fetching repositories...', 'system');
+      const res = await fetch('/api/github/repos', { credentials: 'include' });
+      const data = await res.json();
+      if (data.repos) {
+        setGithubRepos(data.repos);
+        addTerminalLog(`GITHUB_API: Successfully loaded ${data.repos.length} repositories`, 'system');
+      }
+    } catch (e) {
+      addTerminalLog('GITHUB_API_ERROR: Failed to fetch repositories', 'error');
+    }
+  };
+
+  const handleGitHubLogin = async () => {
+    try {
+      addTerminalLog('GITHUB_AUTH: Launching authentication sequence...', 'system');
+      const res = await fetch('/api/auth/github/url');
+      const data = await res.json();
+      
+      if (data.error) {
+        addTerminalLog(`GITHUB_AUTH_ERROR: ${data.error}`, 'error');
+        return;
+      }
+
+      const { url, redirectUri } = data;
+      addTerminalLog(`GITHUB_AUTH: Requested redirect_uri: ${redirectUri}`, 'system');
+      addTerminalLog('GITHUB_AUTH: Verify this matches your GitHub App settings.', 'warn');
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const authWindow = window.open(
+        url,
+        'github_oauth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!authWindow) {
+        addTerminalLog('GITHUB_AUTH_ERROR: Popup blocked. Please enable popups.', 'error');
+        return;
+      }
+
+      // Check for window closure or success message
+      const pollTimer = setInterval(() => {
+        if (authWindow.closed) {
+          clearInterval(pollTimer);
+          addTerminalLog('GITHUB_AUTH: Auth window closed, verifying backend session...', 'system');
+          // Delay verification slightly to allow cookies to settle
+          setTimeout(checkGitHubSession, 1200);
+        }
+      }, 800);
+    } catch (error) {
+      addTerminalLog(`GITHUB_AUTH_ERROR: ${error}`, 'error');
+    }
+  };
+
+  const handleGitHubLogout = async () => {
+    try {
+      await fetch('/api/auth/github/logout', { method: 'POST', credentials: 'include' });
+      setGithubUser(null);
+      setGithubRepos([]);
+      setSelectedRepo(null);
+      addTerminalLog('GITHUB_AUTH: Session terminated', 'system');
+    } catch (error) {
+      addTerminalLog(`GITHUB_AUTH_ERROR: Logout failed`, 'error');
+    }
+  };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data) return;
+
+      // 1. GitHub Auth Success signals
+      if (data.type === 'GITHUB_AUTH_SUCCESS' || data === 'GITHUB_AUTH_SUCCESS') {
+        addTerminalLog('GITHUB_AUTH: Success signal received...', 'system');
+        checkGitHubSession(5); 
+      }
+      
+      // 2. Runtime Event Mapping
+      if (data.type === 'runtime_event' && data.payload) {
+        const { type, message } = data.payload;
+        if (type === 'log') addTerminalLog(message, 'log');
+        if (type === 'error') addTerminalLog(message, 'error');
+        if (type === 'warn') addTerminalLog(message, 'warn');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   useEffect(() => {
@@ -46,18 +180,41 @@ export default function App() {
       if (messages.length === 0 && generatedFiles.length === 0) return;
       
       setSaveStatus('saving');
-      await dbService.saveState({
-        messages,
-        generatedFiles,
-        userProfile
-      });
-      setTimeout(() => setSaveStatus('saved'), 500);
-      setTimeout(() => setSaveStatus('idle'), 2000);
+      try {
+        await dbService.saveState({
+          messages,
+          generatedFiles,
+          userProfile
+        });
+        setSaveStatus('saved');
+        const timeout = setTimeout(() => setSaveStatus('idle'), 2000);
+        return () => clearTimeout(timeout);
+      } catch (e) {
+        console.error("Save failed", e);
+        setSaveStatus('idle');
+      }
     };
 
-    const timeout = setTimeout(saveData, 1000);
+    const timeout = setTimeout(saveData, 3000); // Increased debounce for stability
     return () => clearTimeout(timeout);
   }, [messages, generatedFiles, userProfile]);
+
+  useEffect(() => {
+    if (generatedFiles.length === 0) return;
+    
+    // Stabilize sandbox updates
+    if (sandboxRef.current) {
+      sandboxRef.current.destroy();
+    }
+    const engine = new SandboxEngine(generatedFiles);
+    sandboxRef.current = engine;
+    setPreviewSrcDoc(engine.generateSrcDoc());
+    
+    return () => {
+      // Don't destroy immediately to prevent white screens during rapid typing
+      // sandboxRef.current.destroy() is handled in next iteration or unmount
+    };
+  }, [generatedFiles]);
 
   const handleUpdateProfile = (profile: UserProfile) => {
     setUserProfile(profile);
@@ -104,8 +261,11 @@ export default function App() {
           const newFiles = [...prev];
           data.files.forEach((newFile: GeneratedFile) => {
             const idx = newFiles.findIndex(f => f.name === newFile.name);
-            if (idx > -1) newFiles[idx] = newFile;
-            else newFiles.push(newFile);
+            if (idx > -1) {
+              newFiles[idx] = { ...newFile, diffStatus: 'modified' };
+            } else {
+              newFiles.push({ ...newFile, diffStatus: 'added' });
+            }
           });
           return newFiles;
         });
@@ -123,22 +283,51 @@ export default function App() {
       }]);
       
       addTerminalLog('MODEL_CALLBACK_SUCCESS: 200 OK', 'system');
-    } catch (error) {
+    } catch (error: any) {
       addTerminalLog(`FATAL_ERROR: VFS_SYNC_FAILED - ${error}`, 'error');
-      setMessages(prev => [...prev, { role: 'model', content: 'Connection to architect failed. Retrying sync...' }]);
+      const errorMessage = error.message.includes("high demand") || error.message.includes("503")
+        ? error.message
+        : 'Connection to architect failed. Please try again.';
+      setMessages(prev => [...prev, { role: 'model', content: errorMessage }]);
     } finally {
       setIsTyping(false);
     }
   };
 
   const handleGitHubSync = async () => {
+    if (!selectedRepo) {
+      addTerminalLog('SYNC_ABORT: No repository selected as target', 'error');
+      return;
+    }
+
     setIsSyncing(true);
-    addTerminalLog(`GIT_BRIDGE_INIT: ${commitMessage}`, 'system');
-    // Simulate API call
-    await new Promise(r => setTimeout(r, 2000));
-    setIsSyncing(false);
-    setCommitMessage('');
-    addTerminalLog('GIT_PUSH_SUCCESS: Release tagged as v1.0.' + Date.now().toString().slice(-3), 'system');
+    addTerminalLog(`GIT_BRIDGE_INIT: Pushing ${generatedFiles.length} files to ${selectedRepo}`, 'system');
+    
+    try {
+      const response = await fetch('/api/github/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoFullName: selectedRepo,
+          commitMessage: commitMessage || `Update from Lumina AI Studio v4 - ${new Date().toISOString()}`,
+          files: generatedFiles
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        addTerminalLog(`GIT_PUSH_SUCCESS: ${data.message}`, 'system');
+        setCommitMessage('');
+        setGeneratedFiles(prev => prev.map(f => ({ ...f, diffStatus: undefined })));
+      } else {
+        throw new Error(data.error || 'Sync failed');
+      }
+    } catch (error: any) {
+      addTerminalLog(`GIT_PUSH_ERROR: ${error.message}`, 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleDownloadZip = async () => {
@@ -155,38 +344,8 @@ export default function App() {
   };
 
   const handleUpdateFile = (name: string, content: string) => {
-    setGeneratedFiles(prev => prev.map(f => f.name === name ? { ...f, content } : f));
+    setGeneratedFiles(prev => prev.map(f => f.name === name ? { ...f, content, diffStatus: 'modified' } : f));
   };
-
-  const getIframeSource = useCallback(() => {
-    if (sandboxRef.current) {
-      sandboxRef.current.destroy();
-    }
-    sandboxRef.current = new SandboxEngine(generatedFiles);
-    return sandboxRef.current.generateSrcDoc();
-  }, [generatedFiles]);
-
-  useEffect(() => {
-    return () => {
-      if (sandboxRef.current) {
-        sandboxRef.current.destroy();
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const data = event.data;
-      if (data.type === 'runtime_event') {
-        const { type, message } = data.payload;
-        if (type === 'log') addTerminalLog(message, 'log');
-        if (type === 'error') addTerminalLog(message, 'error');
-        if (type === 'warn') addTerminalLog(message, 'warn');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-white font-sans overflow-hidden selection:bg-gray-900 selection:text-white">
@@ -194,7 +353,10 @@ export default function App() {
         saveStatus={saveStatus} 
         isOffline={isOffline} 
         userProfile={userProfile}
+        githubUser={githubUser}
         onOpenProfile={() => setActiveTab('Profile')}
+        onLogin={handleGitHubLogin}
+        onLogout={handleGitHubLogout}
       />
       
       <main className="flex flex-1 overflow-hidden relative">
@@ -218,7 +380,7 @@ export default function App() {
             previewDevice={previewDevice}
             setPreviewDevice={setPreviewDevice}
             isTyping={isTyping}
-            getIframeSource={getIframeSource}
+            previewSrcDoc={previewSrcDoc}
             commitMessage={commitMessage}
             setCommitMessage={setCommitMessage}
             onGitHubSync={handleGitHubSync}
@@ -229,6 +391,14 @@ export default function App() {
             userProfile={userProfile}
             onUpdateProfile={handleUpdateProfile}
             isOffline={isOffline}
+            githubUser={githubUser}
+            isCheckingSession={isCheckingSession}
+            githubRepos={githubRepos}
+            selectedRepo={selectedRepo}
+            onSelectRepo={setSelectedRepo}
+            onGitHubLogin={handleGitHubLogin}
+            onGitHubLogout={handleGitHubLogout}
+            onRefreshRepos={fetchGitHubRepos}
           />
           <Terminal 
             logs={terminalLogs} 

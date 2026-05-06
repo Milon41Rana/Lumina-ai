@@ -1,15 +1,21 @@
 import React from 'react';
-import { Share2, Rocket, RotateCcw, CheckCircle2, Layout } from 'lucide-react';
+import { Share2, Rocket, RotateCcw, CheckCircle2, Layout, Github } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { UserProfile, GitHubUser } from '../types';
 
 interface NavigationProps {
   saveStatus: 'saving' | 'saved' | 'idle';
   isOffline: boolean;
   userProfile: UserProfile | null;
+  githubUser: GitHubUser | null;
   onOpenProfile: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ saveStatus, isOffline, userProfile, onOpenProfile }) => {
+export const Navigation: React.FC<NavigationProps> = ({ 
+  saveStatus, isOffline, userProfile, githubUser, onOpenProfile, onLogin, onLogout 
+}) => {
   return (
     <nav className="h-14 border-b border-gray-100 bg-white flex items-center justify-between px-4 sticky top-0 z-50 shrink-0">
       <div className="flex items-center gap-4">
@@ -66,10 +72,12 @@ export const Navigation: React.FC<NavigationProps> = ({ saveStatus, isOffline, u
           onClick={onOpenProfile}
           className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 hover:border-gray-400 transition-all overflow-hidden"
         >
-          {userProfile?.avatar ? (
-            <img src={userProfile.avatar} alt="Avatar" className="w-full h-full object-cover" />
+          {githubUser?.avatar ? (
+            <img src={githubUser.avatar} alt="GitHub Avatar" className="w-full h-full object-cover" />
+          ) : userProfile?.avatar ? (
+            <img src={userProfile.avatar} alt="Local Avatar" className="w-full h-full object-cover" />
           ) : (
-            userProfile?.name?.slice(0, 2).toUpperCase() || 'RA'
+            githubUser?.name?.slice(0, 2).toUpperCase() || userProfile?.name?.slice(0, 2).toUpperCase() || 'RA'
           )}
         </button>
       </div>
